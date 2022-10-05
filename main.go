@@ -1,9 +1,7 @@
 package main
 
 import (
-	"context"
 	_ "embed"
-	"fmt"
 	"log"
 
 	"github.com/BurntSushi/toml"
@@ -11,39 +9,39 @@ import (
 )
 
 type Config struct {
-	Secret string `toml:"secret"`
+	Secret     string `toml:"secret"`
+	RootPageID string `toml:"root_page_id"`
 }
 
 //go:embed config.toml
 var configStr string
 
-func main() {
-	var config Config
+var (
+	config Config
+	clt    *notion.Client
+	tree   *TreeNode
+)
+
+func init() {
 	_, err := toml.Decode(configStr, &config)
 	if err != nil {
 		log.Panicln("decode config.toml", err)
 	}
-	fmt.Println("secret:", config.Secret)
-
-	ctx := context.TODO()
-	clt := notion.NewClient(config.Secret)
-	result, err := clt.Search(ctx, &notion.SearchOpts{
-		Query:    "2022.09",
-		PageSize: 100,
-	})
-	// page, err := clt.CreatePage(ctx, notion.CreatePageParams{
-	//     ParentType: notion.ParentTypePage,
-	//     ParentID:   "cbfb36d7b05b4f74aca29b89b7c838be",
-	//     Title: []notion.RichText{
-	//         {
-	//             Text: &notion.Text{
-	//                 Content: "Create Page Example",
-	//             },
-	//         },
-	//     },
-	// })
+	clt = notion.NewClient(config.Secret)
+	tree, err = getRootTree()
 	if err != nil {
-		log.Panic(err)
+		log.Panicln("get root tree failed", err)
 	}
-	fmt.Println(len(result.Results))
+}
+
+func main() {
+	demo()
+	// _ = createPageOnDate(time.Now().Unix())
+	// t, err := getRootTree()
+	// if err != nil {
+	//     log.Println("iter tree failed", err)
+	//     return
+	// }
+	// t.Print(0)
+	_ = addTweetToCallout("3f605dc646364bbf894671f4830ad7e1", nil)
 }
