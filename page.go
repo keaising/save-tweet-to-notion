@@ -9,15 +9,14 @@ import (
 	"github.com/dstotijn/go-notion"
 )
 
-func createPageOnDate(t int64) error {
-	ti := time.Unix(t, 0)
+func createPageOnDate(ti time.Time) error {
 	ctx := context.TODO()
 	var err error
 
 	yearName := fmt.Sprintf("%d", ti.Year())
 	monthName := fmt.Sprintf("%d.%d", ti.Year(), ti.Month())
 
-	yearNode := tree.GetByTitle(yearName)
+	yearNode := pageTree.GetByTitle(yearName)
 	if yearNode == nil {
 		_, err = clt.CreatePage(ctx, notion.CreatePageParams{
 			ParentType: notion.ParentTypePage,
@@ -34,15 +33,15 @@ func createPageOnDate(t int64) error {
 			log.Println("create year page failed:", err)
 			return err
 		}
-		tree, err = getRootTree()
+		pageTree, err = getRootTree()
 	}
-	yearNode = tree.GetByTitle(yearName)
+	yearNode = pageTree.GetByTitle(yearName)
 	if yearNode == nil {
 		log.Println("create year node failed")
 		return fmt.Errorf("create year node failed")
 	}
 
-	monthNode := tree.GetByTitle(monthName)
+	monthNode := pageTree.GetByTitle(monthName)
 	if monthNode != nil {
 		return nil
 	}
@@ -61,7 +60,7 @@ func createPageOnDate(t int64) error {
 		log.Println("create month page failed:", err)
 		return err
 	}
-	tree, err = getRootTree()
+	pageTree, err = getRootTree()
 
 	return nil
 }

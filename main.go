@@ -3,6 +3,7 @@ package main
 import (
 	_ "embed"
 	"log"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/dstotijn/go-notion"
@@ -17,9 +18,9 @@ type Config struct {
 var configStr string
 
 var (
-	config Config
-	clt    *notion.Client
-	tree   *TreeNode
+	config   Config
+	clt      *notion.Client
+	pageTree *TreeNode
 )
 
 func init() {
@@ -27,21 +28,35 @@ func init() {
 	if err != nil {
 		log.Panicln("decode config.toml", err)
 	}
+	log.Println("init notion start")
 	clt = notion.NewClient(config.Secret)
-	tree, err = getRootTree()
+	pageTree, err = getRootTree()
 	if err != nil {
 		log.Panicln("get root tree failed", err)
 	}
+	log.Println("init notion finished")
 }
 
 func main() {
-	demo()
-	// _ = createPageOnDate(time.Now().Unix())
-	// t, err := getRootTree()
-	// if err != nil {
-	//     log.Println("iter tree failed", err)
-	//     return
-	// }
-	// t.Print(0)
-	_ = addTweetToCallout("3f605dc646364bbf894671f4830ad7e1", nil)
+	log.Println("all tweets", len(tweets))
+	for _, tweet := range tweets {
+		ti, err := tweet.GetCreatedAt()
+		if err != nil {
+			break
+		}
+		err = createPageOnDate(ti)
+		if err != nil {
+			break
+		}
+	}
+	for _, tweet := range tweets {
+		ti, err := tweet.GetCreatedAt()
+		if err != nil {
+			break
+		}
+		if err != nil {
+			break
+		}
+		log.Println(tweet.Tweet.ID, ti.Format(time.RFC3339))
+	}
 }
