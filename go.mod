@@ -8,4 +8,7 @@ require (
 	github.com/samber/lo v1.31.0
 )
 
-require golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
+require (
+	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
+	golang.org/x/time v0.0.0-20220922220347-f3bd1da661af // indirect
+)

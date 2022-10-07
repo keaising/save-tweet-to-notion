@@ -63,6 +63,9 @@ func addTweetToCallout(tweet *Tweet, isFirstInDay bool) error {
 		return nil
 	}
 	if isFirstInDay {
+		if err = clt.RateLimiter.Wait(ctx); err != nil {
+			return err
+		}
 		_, err = clt.AppendBlockChildren(ctx, page.ID, []notion.Block{
 			{
 				Object: "block",
@@ -87,6 +90,9 @@ func addTweetToCallout(tweet *Tweet, isFirstInDay bool) error {
 		}
 	}
 
+	if err = clt.RateLimiter.Wait(ctx); err != nil {
+		return err
+	}
 	_, err = clt.AppendBlockChildren(ctx, page.ID, convertTweetToBlock(tweet))
 	if err != nil {
 		log.Println("append callout to page failed", err)

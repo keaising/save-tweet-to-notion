@@ -10,6 +10,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/dstotijn/go-notion"
 	"github.com/samber/lo"
+	"golang.org/x/time/rate"
 )
 
 type Config struct {
@@ -22,9 +23,15 @@ var configStr string
 
 var (
 	config   Config
-	clt      *notion.Client
 	pageTree *TreeNode
 )
+
+type notionClient struct {
+	RateLimiter *rate.Limiter
+	*notion.Client
+}
+
+var clt *notionClient
 
 var timeZone = "Asia/Shanghai"
 
@@ -42,7 +49,11 @@ func init() {
 	}
 
 	log.Println("init notion start")
-	clt = notion.NewClient(config.Secret)
+	nClt := notion.NewClient(config.Secret)
+	clt = &notionClient{
+		rate.NewLimiter(rate.Every(time.Second), 1),
+		nClt,
+	}
 	pageTree, err = getRootTree()
 	if err != nil {
 		log.Panicln("get root tree failed", err)
@@ -117,7 +128,7 @@ func addTweets() {
 func worker(id int, jobs <-chan tweetGroup, wg *sync.WaitGroup) {
 	// append tweet to correct month
 	for g := range jobs {
-		today := g.tweets[0].CreatedAt.YearDay()
+		today := g.tweets[0].CreatedAt.YearDay() - 1
 		var isFirst bool
 		log.Printf("%d begin  month %d.%d", id, time.Unix(g.month, 0).Year(), time.Unix(g.month, 0).Month())
 		for _, tweet := range g.tweets {

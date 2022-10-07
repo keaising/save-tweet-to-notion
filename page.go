@@ -18,6 +18,9 @@ func createPageOnDate(ti time.Time) error {
 
 	yearNode := pageTree.GetByTitle(yearName)
 	if yearNode == nil {
+		if err = clt.RateLimiter.Wait(ctx); err != nil {
+			return err
+		}
 		_, err = clt.CreatePage(ctx, notion.CreatePageParams{
 			ParentType: notion.ParentTypePage,
 			ParentID:   config.RootPageID,
@@ -33,7 +36,7 @@ func createPageOnDate(ti time.Time) error {
 			log.Println("create year page failed:", err)
 			return err
 		}
-		pageTree, err = getRootTree()
+		pageTree, _ = getRootTree()
 	}
 	yearNode = pageTree.GetByTitle(yearName)
 	if yearNode == nil {
@@ -44,6 +47,9 @@ func createPageOnDate(ti time.Time) error {
 	monthNode := pageTree.GetByTitle(monthName)
 	if monthNode != nil {
 		return nil
+	}
+	if err = clt.RateLimiter.Wait(ctx); err != nil {
+		return err
 	}
 	_, err = clt.CreatePage(ctx, notion.CreatePageParams{
 		ParentType: notion.ParentTypePage,
@@ -69,6 +75,9 @@ func getRootTree() (*TreeNode, error) {
 	ctx := context.TODO()
 	t := TreeNode{ID: config.RootPageID}
 
+	if err := clt.RateLimiter.Wait(ctx); err != nil {
+		return nil, err
+	}
 	page, err := clt.FindPageByID(ctx, config.RootPageID)
 	if err != nil {
 		log.Println("get root tree: find page by id failed", err)
