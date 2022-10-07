@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"sort"
+	"time"
 )
 
 var (
@@ -14,7 +15,7 @@ var (
 	tweetStr string
 
 	profile Profile
-	tweets  []Tweet
+	tweets  []*Tweet
 )
 
 func init() {
@@ -34,11 +35,17 @@ func init() {
 		log.Println("unmarshal tweets", err)
 	}
 
+	for i := range tweets {
+		ti, err := time.Parse(time.RubyDate, tweets[i].Tweet.CreatedAt)
+		if err != nil {
+			log.Println("parse time fail", tweets[i].Tweet.ID, err)
+		}
+		tweets[i].CreatedAt = ti
+	}
+
 	log.Println("sort tweets")
 	sort.Slice(tweets, func(i, j int) bool {
-		ti, _ := tweets[i].GetCreatedAt()
-		tj, _ := tweets[j].GetCreatedAt()
-		return ti.Unix() < tj.Unix()
+		return tweets[i].CreatedAt.Unix() < tweets[j].CreatedAt.Unix()
 	})
 
 	log.Println(tweets[0].GetCreatedAtMonth())

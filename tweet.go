@@ -43,26 +43,14 @@ type Tweet struct {
 			} `json:"hashtags"`
 		} `json:"entities"`
 	} `json:"tweet"`
-}
-
-func (t *Tweet) GetCreatedAt() (time.Time, error) {
-	ti, err := time.Parse(time.RubyDate, t.Tweet.CreatedAt)
-	if err != nil {
-		log.Println("parse time fail", t.Tweet.ID, err)
-		return time.Now(), err
-	}
-	return ti, nil
+	CreatedAt time.Time `json:"-"`
 }
 
 func (t *Tweet) GetCreatedAtMonth() (string, error) {
-	ti, err := t.GetCreatedAt()
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%d.%d", ti.Year(), ti.Month()), nil
+	return fmt.Sprintf("%d.%d", t.CreatedAt.Year(), t.CreatedAt.Month()), nil
 }
 
-func addTweetToCallout(tweet *Tweet) error {
+func addTweetToCallout(tweet *Tweet, isFirstInDay bool) error {
 	ctx := context.TODO()
 
 	month, err := tweet.GetCreatedAtMonth()
@@ -73,6 +61,30 @@ func addTweetToCallout(tweet *Tweet) error {
 	if page == nil {
 		log.Println("page not found", month)
 		return nil
+	}
+	if isFirstInDay {
+		_, err = clt.AppendBlockChildren(ctx, page.ID, []notion.Block{
+			{
+				Object: "block",
+				Type:   notion.BlockTypeParagraph,
+				Paragraph: &notion.RichTextBlock{
+					Text: []notion.RichText{
+						{
+							Type: notion.RichTextTypeMention,
+							Mention: &notion.Mention{
+								Date: &notion.Date{
+									Start:    notion.NewDateTime(tweet.CreatedAt, false),
+									TimeZone: &timeZone,
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+		if err != nil {
+			log.Println("append time paragraph to page failed", err)
+		}
 	}
 
 	_, err = clt.AppendBlockChildren(ctx, page.ID, convertTweetToBlock(tweet))

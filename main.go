@@ -3,10 +3,13 @@ package main
 import (
 	_ "embed"
 	"log"
+	"sort"
+	"sync"
 	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/dstotijn/go-notion"
+	"github.com/samber/lo"
 )
 
 type Config struct {
@@ -23,11 +26,21 @@ var (
 	pageTree *TreeNode
 )
 
+var timeZone = "Asia/Shanghai"
+
+var loc *time.Location
+
 func init() {
 	_, err := toml.Decode(configStr, &config)
 	if err != nil {
 		log.Panicln("decode config.toml", err)
 	}
+
+	loc, err = time.LoadLocation(timeZone)
+	if err != nil {
+		log.Panicln("get timezone failed", err)
+	}
+
 	log.Println("init notion start")
 	clt = notion.NewClient(config.Secret)
 	pageTree, err = getRootTree()
@@ -38,25 +51,88 @@ func init() {
 }
 
 func main() {
-	log.Println("all tweets", len(tweets))
+	createdPages()
+
+	// _ = addTweetToCallout(tweets[0], true)
+	addTweets()
+}
+
+func createdPages() {
+	// get all month
+	months := make(map[int64]string)
 	for _, tweet := range tweets {
-		ti, err := tweet.GetCreatedAt()
-		if err != nil {
-			break
-		}
-		err = createPageOnDate(ti)
+		month := time.Date(tweet.CreatedAt.Year(), tweet.CreatedAt.Month(), 1, 0, 0, 0, 0, loc).Unix()
+		months[month] = ""
+	}
+	firstDays := lo.MapToSlice(months, func(k int64, v string) time.Time {
+		return time.Unix(k, 0)
+	})
+	sort.Slice(firstDays, func(i, j int) bool {
+		return firstDays[i].Unix() < firstDays[j].Unix()
+	})
+
+	// create all pages
+	for _, month := range firstDays {
+		err := createPageOnDate(month)
 		if err != nil {
 			break
 		}
 	}
-	for _, tweet := range tweets {
-		ti, err := tweet.GetCreatedAt()
-		if err != nil {
-			break
+}
+
+type tweetGroup struct {
+	month  int64
+	tweets []*Tweet
+}
+
+func addTweets() {
+	// group tweets by month
+	var tweetGroups []tweetGroup
+
+	for k, v := range lo.GroupBy(tweets, func(tweet *Tweet) int64 {
+		return time.Date(tweet.CreatedAt.Year(), tweet.CreatedAt.Month(), 1, 0, 0, 0, 0, loc).Unix()
+	}) {
+		tweetGroups = append(tweetGroups, tweetGroup{k, v})
+	}
+	sort.Slice(tweetGroups, func(i, j int) bool {
+		return tweetGroups[i].month < tweetGroups[j].month
+	})
+
+	numJobs := 20
+	jobs := make(chan tweetGroup, numJobs)
+	var wg sync.WaitGroup
+
+	for w := 0; w < 10; w++ {
+		go worker(w, jobs, &wg)
+	}
+	for i := range tweetGroups {
+		jobs <- tweetGroups[i]
+		wg.Add(1)
+	}
+	wg.Wait()
+
+	close(jobs)
+}
+
+func worker(id int, jobs <-chan tweetGroup, wg *sync.WaitGroup) {
+	// append tweet to correct month
+	for g := range jobs {
+		today := g.tweets[0].CreatedAt.YearDay()
+		var isFirst bool
+		log.Printf("%d begin  month %d.%d", id, time.Unix(g.month, 0).Year(), time.Unix(g.month, 0).Month())
+		for _, tweet := range g.tweets {
+			if tweet.CreatedAt.YearDay() != today {
+				isFirst = true
+				today = tweet.CreatedAt.YearDay()
+			} else {
+				isFirst = false
+			}
+			err := addTweetToCallout(tweet, isFirst)
+			if err != nil {
+				break
+			}
 		}
-		if err != nil {
-			break
-		}
-		log.Println(tweet.Tweet.ID, ti.Format(time.RFC3339))
+		log.Printf("%d finish month %d.%d", id, time.Unix(g.month, 0).Year(), time.Unix(g.month, 0).Month())
+		wg.Done()
 	}
 }
