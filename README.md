@@ -27,6 +27,7 @@ That's it.
 Change `config.toml.example` to `config.toml`
 
 `secret`: Notion integration's secret
+
 `root_page_id`: The root page which you want to write all tweets to
 
 You can find these config in [Notion API Doc](https://developers.notion.com/docs), go through guide and things will be clear.
